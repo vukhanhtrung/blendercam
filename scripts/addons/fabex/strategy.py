@@ -83,32 +83,42 @@ def add_pocket(maxdepth, sname, new_cutter_diameter):
         sname (str): The name of the object to which the pocket will be added.
         new_cutter_diameter (float): The diameter of the new cutter to be used.
     """
-
+    op_name = sname + "MedialPocket"
+    pocket_obj_name = sname + "_medial_pocket"
     bpy.ops.object.select_all(action="DESELECT")
     s = bpy.context.scene
     mpocket_exists = False
     for ob in s.objects:  # delete old medial pocket
-        if ob.name.startswith("medial_poc"):
+        if ob.name.startswith(pocket_obj_name):
             ob.select_set(True)
             bpy.ops.object.delete()
 
     for op in s.cam_operations:  # verify medial pocket operation exists
-        if op.name == "MedialPocket":
+        if op.object_name == pocket_obj_name:
             mpocket_exists = True
     ob = bpy.data.objects[sname]
     ob.select_set(True)
     bpy.context.view_layer.objects.active = ob
     silhouette_offset(ob, -new_cutter_diameter / 2, 1, 2)
-    bpy.context.active_object.name = "medial_pocket"
+    bpy.context.active_object.name = pocket_obj_name
     m_ob = bpy.context.view_layer.objects.active
     bpy.ops.object.origin_set(type="ORIGIN_GEOMETRY", center="BOUNDS")
+    # Parent pocket object to original object
+    m_ob.parent = ob
+    m_ob.matrix_parent_inverse = ob.matrix_world.inverted()
     m_ob.location.z = maxdepth
+    # And move it to the same collection
+    for col in m_ob.users_collection:
+        col.objects.unlink(m_ob)
+    for col in ob.users_collection:
+        col.objects.link(m_ob)
+
     if not mpocket_exists:  # create a pocket operation if it does not exist already
         s.cam_operations.add()
         o = s.cam_operations[-1]
-        o.object_name = "medial_pocket"
+        o.object_name = pocket_obj_name
         s.cam_active_operation = len(s.cam_operations) - 1
-        o.name = "MedialPocket"
+        o.name = op_name
         o.filename = o.name
         o.strategy = "POCKET"
         o.use_layers = False
